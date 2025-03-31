@@ -1,0 +1,16 @@
+//@version=6
+indicator('VerticalLine at specific time', overlay = true)
+
+// Function drawVerticalLine
+drawVerticalLine(targetTime) =>
+    line.new(x1 = targetTime, y1 = low, x2 = targetTime, y2 = high, xloc = xloc.bar_time, extend = extend.both, color = color.new(#ea5e50, 10), style = line.style_solid, width = 2)
+
+// Call Function drawVerticalLine and passing TargetTime
+targetTime = timestamp('GMT-4', year, month, dayofmonth, 17, 00, 00)
+drawVerticalLine(targetTime)
+
+targetTime1 = timestamp('GMT-4', year, month, dayofmonth, 18, 00, 00)
+drawVerticalLine(targetTime1)
+
+targetTime2 = timestamp('GMT-4', year, month, dayofmonth, 20, 00, 00)
+drawVerticalLine(targetTime2)
