@@ -1,0 +1,31 @@
+//@version=5
+indicator("VerticalLine at specific time", overlay=true)
+
+// Function to draw vertical line
+drawVerticalLine(targetTime) =>
+    line.new(
+         x1 = targetTime, 
+         y1 = low, 
+         x2 = targetTime, 
+         y2 = high, 
+         xloc = xloc.bar_time, 
+         extend = extend.both, 
+         color = color.new(#ea5e50, 10), 
+         style = line.style_solid, 
+         width = 2
+     )
+
+// Get current bar's date components
+currentYear = year(time)
+currentMonth = month(time)
+currentDay = dayofmonth(time)
+
+// Create timestamps for desired times (Eastern Time GMT-4)
+targetTime  = timestamp(currentYear, currentMonth, currentDay, 17, 00)
+targetTime1 = timestamp(currentYear, currentMonth, currentDay, 18, 00)
+targetTime2 = timestamp(currentYear, currentMonth, currentDay, 20, 00)
+
+// Draw lines
+drawVerticalLine(targetTime)
+drawVerticalLine(targetTime1)
+drawVerticalLine(targetTime2)
