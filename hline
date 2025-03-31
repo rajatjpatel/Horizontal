@@ -1,0 +1,44 @@
+//@version=6
+indicator(title = '40 Horizontal Lines at Price', shorttitle = '40 H-Lines', overlay = true)
+
+price_level = input.float(title = 'Price Level', defval = 102.0)
+hline(price = price_level, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level1 = input.float(title = 'Price Level 1', defval = 100.0)
+hline(price = price_level1, color = color.blue, linewidth = 2, linestyle = hline.style_solid)
+
+price_level2 = input.float(title = 'Price Level 2', defval = 101.0)
+hline(price = price_level2, color = color.red, linewidth = 2, linestyle = hline.style_solid)
+
+price_level3 = input.float(title = 'Price Level 3', defval = 102.0)
+hline(price = price_level3, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level4 = input.float(title = 'Price Level 4', defval = 102.0)
+hline(price = price_level4, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level5 = input.float(title = 'Price Level 5', defval = 102.0)
+hline(price = price_level5, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level6 = input.float(title = 'Price Level 5', defval = 102.0)
+hline(price = price_level6, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level7 = input.float(title = 'Price Level 7', defval = 102.0)
+hline(price = price_level7, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level8 = input.float(title = 'Price Level 8', defval = 102.0)
+hline(price = price_level8, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level9 = input.float(title = 'Price Level 9', defval = 102.0)
+hline(price = price_level9, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level10 = input.float(title = 'Price Level 10', defval = 102.0)
+hline(price = price_level10, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level11 = input.float(title = 'Price Level 11', defval = 102.0)
+hline(price = price_level11, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+price_level12 = input.float(title = 'Price Level 12', defval = 102.0)
+hline(price = price_level12, color = color.green, linewidth = 2, linestyle = hline.style_solid)
+
+
+
