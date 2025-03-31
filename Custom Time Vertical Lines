@@ -1,0 +1,15 @@
+//@version=6
+indicator('Custom Time Vertical Lines', overlay = true)
+
+inputTime1 = input.time(timestamp('01 Jan 2025 17:00'), 'Line 1 Time')
+inputTime2 = input.time(timestamp('01 Jan 2025 18:00'), 'Line 2 Time')
+inputTime3 = input.time(timestamp('01 Jan 2025 20:00'), 'Line 3 Time')
+
+lineColor = color.new(color.purple, 70)
+
+drawVerticalLine(t) =>
+    line.new(t, low, t, high, xloc = xloc.bar_time, extend = extend.both, color = lineColor)
+
+drawVerticalLine(inputTime1)
+drawVerticalLine(inputTime2)
+drawVerticalLine(inputTime3)
