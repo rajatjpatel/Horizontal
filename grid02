@@ -1,0 +1,302 @@
+from IPython.display import display, HTML
+import ipywidgets as widgets
+from ipywidgets import VBox
+import math # Not strictly necessary for this version, but kept for consistency
+
+# --- generate_gann_grid function (generates the spiral number grid) ---
+# (Using the same function as before)
+def generate_gann_grid(layers=3):
+    """Generates a spiral grid of numbers based on Gann principles."""
+    size = 2 * layers + 1
+    grid = [[0] * size for _ in range(size)]
+    x, y = layers, layers  # Center coordinates (starting point)
+    if 0 <= x < size and 0 <= y < size:
+      grid[x][y] = 1
+    else:
+      if size == 1: grid[0][0]=1
+      else: return grid # Should not happen for layers > 0
+
+    directions = [(0, -1), (-1, 0), (0, 1), (1, 0)] # L, U, R, D
+    dir_idx = 0
+    steps = 1
+    num = 2
+    steps_taken_in_current_dir = 0
+    total_numbers = size * size
+
+    while num <= total_numbers:
+        dx, dy = directions[dir_idx]
+        x += dx
+        y += dy
+        if 0 <= x < size and 0 <= y < size:
+            grid[x][y] = num
+            num += 1
+        else:
+             break
+        steps_taken_in_current_dir += 1
+        if steps_taken_in_current_dir == steps:
+            steps_taken_in_current_dir = 0
+            dir_idx = (dir_idx + 1) % 4
+            if dir_idx % 2 == 0:
+                steps += 1
+        if num > total_numbers: break
+    return grid
+
+# --- get_cross_lines function (calculates coordinates for cross/diagonal lines) ---
+# (Using the same function as before)
+def get_cross_lines(center, grid_size):
+    """Calculates coordinates for cardinal and diagonal lines through a center point."""
+    cx, cy = center
+    lines_coords = set()
+    for y in range(grid_size): lines_coords.add((cx, y)) # Row
+    for x in range(grid_size): lines_coords.add((x, cy)) # Col
+    diff = cx - cy
+    for r in range(grid_size): # Diag 1 (\)
+        c = r - diff
+        if 0 <= c < grid_size: lines_coords.add((r,c))
+    sum_rc = cx + cy
+    for r in range(grid_size): # Diag 2 (/)
+        c = sum_rc - r
+        if 0 <= c < grid_size: lines_coords.add((r, c))
+    return lines_coords
+
+# <<< --- NEW: Function to calculate corner numbers of rings --- >>>
+def get_ring_corner_numbers(center_pos, max_rings, pos_to_num, grid_size):
+    """
+    Calculates the numbers at the corners of expanding square rings around a center.
+
+    Args:
+        center_pos (tuple): (row, col) of the dynamic center.
+        max_rings (int): How many rings outwards to calculate corners for.
+        pos_to_num (dict): Mapping from (row, col) tuple to the number in the grid.
+        grid_size (int): The dimension of the square grid.
+
+    Returns:
+        dict: A dictionary where keys are ring indices (1, 2, ...) and
+              values are lists of numbers found at the corners of that ring.
+              The corner order in the list is typically [Top-Left, Top-Right, Bottom-Right, Bottom-Left].
+    """
+    center_r, center_c = center_pos
+    corner_numbers_by_ring = {}
+
+    for radius in range(1, max_rings + 1):
+        corners_on_this_ring = []
+        # Define corner coordinates relative to the center
+        corner_coords = [
+            (center_r - radius, center_c - radius), # Top-Left
+            (center_r - radius, center_c + radius), # Top-Right
+            (center_r + radius, center_c + radius), # Bottom-Right
+            (center_r + radius, center_c - radius), # Bottom-Left
+        ]
+
+        for r, c in corner_coords:
+            # Check if the corner is within the grid boundaries
+            if 0 <= r < grid_size and 0 <= c < grid_size:
+                pos = (r, c)
+                # Look up the number at this position
+                if pos in pos_to_num:
+                    corners_on_this_ring.append(pos_to_num[pos])
+                else:
+                    corners_on_this_ring.append(None) # Indicate if corner has no number (or is outside)
+            else:
+                corners_on_this_ring.append(None) # Indicate corner outside grid
+
+        # Only add the ring to the results if at least one corner number was found
+        # (or always add it, even if all corners are outside/empty?)
+        # Let's add it if it contains at least one valid number.
+        if any(num is not None for num in corners_on_this_ring):
+             # Store the found numbers (including None for invalid/empty corners)
+            corner_numbers_by_ring[radius] = corners_on_this_ring
+
+    return corner_numbers_by_ring
+
+# --- Main function to create the interactive grid ---
+def create_interactive_grid(layers=16):
+    """Creates and displays an interactive grid with center selection and corner calculation."""
+
+    print(f"Generating {2*layers+1}x{2*layers+1} grid...")
+    grid = generate_gann_grid(layers)
+    size = 2 * layers + 1
+    if not grid or size == 0:
+        print("Error: Grid generation failed.")
+        return
+    print("Grid generated. Creating widgets...")
+
+    # Create lookups
+    num_to_pos = {}
+    pos_to_num = {}
+    for r in range(size):
+        for c in range(size):
+            num = grid[r][c]
+            if num != 0:
+                 num_to_pos[num] = (r, c)
+                 pos_to_num[(r, c)] = num
+
+    buttons = [[None for _ in range(size)] for _ in range(size)]
+
+    # Configure the grid container
+    grid_box = widgets.GridBox(
+        children=[],
+        layout=widgets.Layout(
+            grid_template_rows=f"repeat({size}, 25px)",
+            grid_template_columns=f"repeat({size}, 25px)",
+            grid_gap="1px", border="1px solid #ccc",
+            width=f"{size * 26 + 2}px", height=f"{size * 26 + 2}px",
+        )
+    )
+
+    # Output widget
+    output_area = widgets.Output(layout={'border': '1px solid black', 'padding': '5px', 'margin_top': '10px', 'max_height': '300px', 'overflow_y': 'auto'}) # Increased height
+
+    # --- State variables ---
+    selected_center_num = None
+    selected_center_pos = None
+    selected_cross_coords = set()
+    # <<< NEW/REVISED: State for the second/trigger click >>>
+    trigger_num = None
+    trigger_pos = None
+
+    # --- update_styles function ---
+    def update_styles():
+        """Updates button colors based on selected center, cross, and trigger point."""
+        nonlocal selected_center_pos, selected_cross_coords, trigger_pos
+
+        COLOR_SELECTED_CENTER = '#FFD700' # Gold/Yellow
+        COLOR_SELECTED_CROSS = '#ADD8E6' # Light Blue
+        COLOR_TRIGGER = '#FFA500'     # Orange
+        COLOR_DEFAULT = 'lightgray'
+        COLOR_EMPTY = 'white'
+        COLOR_TEXT = 'black'
+
+        for r in range(size):
+            for c in range(size):
+                btn = buttons[r][c]
+                if btn is None: continue
+                pos = (r, c)
+                num = pos_to_num.get(pos)
+
+                if num is None:
+                    btn.description = ''
+                    btn.style.button_color = COLOR_EMPTY
+                    btn.disabled = True; continue
+                else:
+                     btn.description = str(num)
+                     btn.disabled = False
+
+                color = COLOR_DEFAULT
+                if selected_center_pos: # Apply highlights only if a center is selected
+                    if pos in selected_cross_coords and pos != selected_center_pos:
+                        color = COLOR_SELECTED_CROSS
+                    # <<< NEW: Highlight the trigger point >>>
+                    if pos == trigger_pos:
+                         color = COLOR_TRIGGER # Trigger color overrides cross color
+                    # Center color overrides all others for that specific button
+                    if pos == selected_center_pos:
+                        color = COLOR_SELECTED_CENTER
+
+                btn.style.button_color = color
+                btn.style.text_color = COLOR_TEXT
+                btn.style.font_size = '9px'
+
+    # --- on_click handler ---
+    def on_click(button):
+        """Handles clicks for center selection and triggering corner calculation."""
+        nonlocal selected_center_num, selected_center_pos, selected_cross_coords
+        nonlocal trigger_num, trigger_pos # Include trigger state
+
+        try:
+            num = int(button.description)
+            clicked_pos = num_to_pos[num]
+        except (ValueError, KeyError):
+             with output_area:
+                 output_area.clear_output(wait=True)
+                 print(f"Error: Invalid button data '{button.description}'")
+             return
+
+        # --- Logic based on current state ---
+        if selected_center_pos is None:
+            # === STATE 1: No center selected -> Select Center ===
+            selected_center_num = num
+            selected_center_pos = clicked_pos
+            selected_cross_coords = get_cross_lines(selected_center_pos, size)
+            trigger_num = None # Clear trigger when selecting new center
+            trigger_pos = None
+            with output_area:
+                output_area.clear_output(wait=True)
+                print(f"Selected Center: {selected_center_num} at {selected_center_pos}")
+                print("Click another number to trigger corner calculation.")
+
+        elif clicked_pos == selected_center_pos:
+            # === STATE 2: Clicked the selected center -> Deselect All ===
+            with output_area:
+                output_area.clear_output(wait=True)
+                print(f"Deselected center number {selected_center_num}.")
+            selected_center_num = None
+            selected_center_pos = None
+            selected_cross_coords = set()
+            trigger_num = None
+            trigger_pos = None
+
+        else:
+            # === STATE 3: Center selected, clicked DIFFERENT number -> Set Trigger & Calculate ===
+            trigger_num = num
+            trigger_pos = clicked_pos
+
+            with output_area:
+                output_area.clear_output(wait=True) # Clear previous messages
+                print(f"Selected Center: {selected_center_num} at {selected_center_pos}")
+                print(f"Trigger Number: {trigger_num} at {trigger_pos}")
+                print("-" * 20)
+                print("Calculating Ring Corners (around center):")
+
+                # Calculate corner numbers for rings around the selected_center_pos
+                # Let's calculate for, say, 10 rings outwards
+                max_rings_to_calc = 10
+                corner_data = get_ring_corner_numbers(selected_center_pos, max_rings_to_calc, pos_to_num, size)
+
+                if not corner_data:
+                    print("Could not calculate any corners (center might be near edge or max_rings too small).")
+                else:
+                    # Print the corner numbers for each ring
+                    for ring_idx in sorted(corner_data.keys()):
+                        # Get corners: [TL, TR, BR, BL] (can contain None)
+                        corners = corner_data[ring_idx]
+                        # Format Nones as '---' for clarity
+                        formatted_corners = [str(c) if c is not None else '---' for c in corners]
+                        print(f"Ring {ring_idx}: [{', '.join(formatted_corners)}]")
+
+                        # Check if any of the example numbers appear in the corners list
+                        example_nums = {201, 261, 329, 405, 489, 581}
+                        found_examples = [c for c in corners if c in example_nums]
+                        if found_examples:
+                            print(f"  (Contains example numbers: {found_examples})")
+
+
+        # Update button styles after any action
+        update_styles()
+
+    # --- Initialize and add buttons to the GridBox ---
+    button_list = []
+    print("Creating buttons...")
+    for r in range(size):
+        for c in range(size):
+            num = pos_to_num.get((r,c))
+            btn = widgets.Button(
+                description=str(num) if num is not None else '',
+                layout=widgets.Layout(width='25px', height='25px', margin='0', padding='0', border='none'),
+                style={'button_color': 'lightgray', 'text_color': 'black', 'font_size': '9px'}
+            )
+            if num is not None: btn.on_click(on_click)
+            else: btn.disabled = True; btn.style.button_color = 'white'
+            buttons[r][c] = btn
+            button_list.append(btn)
+
+    print("Assigning buttons to grid...")
+    grid_box.children = tuple(button_list)
+    print("Applying initial styles...")
+    update_styles()
+
+    print("Displaying grid.")
+    display(VBox([grid_box, output_area]))
+
+# --- Run the function ---
+create_interactive_grid(layers=16) # 33x33 grid
