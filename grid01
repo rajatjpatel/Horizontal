@@ -1,0 +1,178 @@
+from IPython.display import display, HTML
+import ipywidgets as widgets
+from ipywidgets import VBox # Import VBox for layout
+import math
+
+# --- generate_gann_grid and get_cross_lines functions remain the same ---
+def generate_gann_grid(layers=3):
+    """Generates a spiral grid of numbers based on Gann principles."""
+    size = 2 * layers + 1
+    grid = [[0] * size for _ in range(size)]
+    x, y = layers, layers  # Center coordinates (starting point)
+    grid[x][y] = 1
+
+    # Directions: (row_change, col_change) -> E, S, W, N
+    directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]
+    dir_idx = 0
+    steps = 1
+    num = 2
+
+    while num <= size * size:
+        for _ in range(2):
+            dx, dy = directions[dir_idx]
+            for _ in range(steps):
+                if num > size * size: break
+                x += dx
+                y += dy
+                if 0 <= x < size and 0 <= y < size:
+                    grid[x][y] = num
+                    num += 1
+                else:
+                    print(f"Warning: Went out of bounds at ({x},{y}) placing {num}")
+                    break
+            if num > size * size: break
+            dir_idx = (dir_idx + 1) % 4
+        if num > size * size: break
+        steps += 1
+    return grid
+
+def get_cross_lines(center, grid_size):
+    """Calculates coordinates for cardinal and diagonal lines through a center point."""
+    cx, cy = center
+    lines = []
+    diag1 = []
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if i - j == cx - cy: diag1.append((i, j))
+    lines.append(diag1)
+    diag2 = []
+    for i in range(grid_size):
+        for j in range(grid_size):
+            if i + j == cx + cy: diag2.append((i, j))
+    lines.append(diag2)
+    lines.append([(cx, y) for y in range(grid_size)])
+    lines.append([(x, cy) for x in range(grid_size)])
+    return lines
+# --- End of unchanged functions ---
+
+
+def create_interactive_grid(layers=3):
+    """Creates and displays an interactive ipywidgets grid with an output area."""
+    grid = generate_gann_grid(layers)
+    size = 2 * layers + 1
+    num_to_pos = {}
+    for r in range(size):
+        for c in range(size):
+            if grid[r][c] != 0:
+                 num_to_pos[grid[r][c]] = (r, c)
+
+    buttons = [[None for _ in range(size)] for _ in range(size)]
+
+    grid_box = widgets.GridBox(
+        children=[],
+        layout=widgets.Layout(
+            grid_template_rows=f"repeat({size}, 40px)",
+            grid_template_columns=f"repeat({size}, 40px)",
+            grid_gap="1px",
+            border="1px solid #ccc",
+            width=f"{size * 41 + 2}px",
+            height=f"{size * 41 + 2}px"
+        )
+    )
+
+    # --- NEW: Create an Output widget ---
+    output_area = widgets.Output(layout={'border': '1px solid black', 'padding': '5px'})
+
+    original_center = num_to_pos[1]
+    original_cross_coords = set()
+    for line in get_cross_lines(original_center, size):
+        for pos in line:
+            if 0 <= pos[0] < size and 0 <= pos[1] < size:
+                original_cross_coords.add(pos)
+
+    selected_center = None
+    selected_cross_coords = set()
+
+    def update_styles():
+        """Updates button colors based on original and selected crosses."""
+        for r in range(size):
+            for c in range(size):
+                btn = buttons[r][c]
+                if btn is None: continue
+                pos = (r, c)
+                num = grid[r][c]
+                btn.description = str(num)
+                color = 'lightgray'
+                if pos in original_cross_coords and pos != original_center: color = '#FFFFE0' # Light Yellow
+                if pos in selected_cross_coords and pos != selected_center: color = '#ADD8E6' # Light Blue
+                if pos == original_center: color = '#90EE90' # Light Green
+                if pos == selected_center: color = '#FFB6C1' # Light Pink
+                btn.style.button_color = color
+                btn.style.text_color = 'black'
+
+    def on_click(button):
+        """Handles button click events to update selection and display output."""
+        nonlocal selected_center, selected_cross_coords
+        try:
+            num = int(button.description)
+            new_center = num_to_pos[num]
+        except (ValueError, KeyError):
+             # --- NEW: Output error message ---
+             with output_area:
+                 output_area.clear_output(wait=True) # Clear previous output
+                 print(f"Error: Could not process button click for description '{button.description}'")
+             return
+
+        # Toggle selection
+        if new_center == selected_center:
+            selected_center = None
+            selected_cross_coords = set()
+            # --- NEW: Output deselection message ---
+            with output_area:
+                output_area.clear_output(wait=True)
+                print(f"Deselected number {num} at coordinates {new_center}.")
+        else:
+            selected_center = new_center
+            selected_cross_coords = set()
+            for line in get_cross_lines(selected_center, size):
+                for pos in line:
+                    if 0 <= pos[0] < size and 0 <= pos[1] < size:
+                        selected_cross_coords.add(pos)
+            # --- NEW: Output selection message ---
+            with output_area:
+                 output_area.clear_output(wait=True) # Clear previous before printing new
+                 print(f"Selected number: {num}")
+                 print(f"Coordinates (row, col): {selected_center}")
+                 # Optional: Add more details if needed
+                 # print(f"Cross coordinates calculated.")
+
+        update_styles() # Redraw the grid with updated colors
+
+    # Initialize and add buttons to the GridBox
+    button_list = []
+    for r in range(size):
+        for c in range(size):
+            num = grid[r][c]
+            btn = widgets.Button(
+                description=str(num) if num != 0 else '',
+                layout=widgets.Layout(width='40px', height='40px', margin='0', padding='0', border='none'),
+                style={'button_color': 'lightgray', 'text_color': 'black'}
+            )
+            btn.on_click(on_click)
+            buttons[r][c] = btn
+            button_list.append(btn)
+
+    grid_box.children = tuple(button_list)
+
+    update_styles()
+
+    # --- NEW: Display the grid AND the output area using a VBox ---
+    # This arranges them vertically.
+    display(VBox([grid_box, output_area]))
+
+# --- Run the function ---
+# Create a grid with 9 layers (19x19 grid)
+create_interactive_grid(layers=9)
+
+# Example with a smaller grid for quicker testing:
+# create_interactive_grid(layers=2) # Creates a 5x5 grid
