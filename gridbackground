@@ -1,0 +1,81 @@
+import math
+
+def generate_gann_grid(layers):
+    """Optimized spiral grid generator without full matrix storage"""
+    size = 2 * layers + 1
+    grid = {}
+    x = y = layers
+    grid[(x,y)] = 1
+
+    directions = [(0,-1), (-1,0), (0,1), (1,0)] # L, U, R, D
+    dir_idx, step_size, num = 0, 1, 2
+
+    for _ in range(layers*4):  # Max needed iterations
+        for _ in range(2):
+            dx, dy = directions[dir_idx]
+            for _ in range(step_size):
+                x += dx
+                y += dy
+                if 0 <= x < size and 0 <= y < size:
+                    grid[(x,y)] = num
+                    num += 1
+            dir_idx = (dir_idx + 1) % 4
+        step_size += 1
+        if num > (size*size): break
+    return grid, size
+
+def find_position(grid, number):
+    """Find coordinates for a given number"""
+    return next((k for k, v in grid.items() if v == number), None)
+
+def get_cross_numbers(grid, center_pos, size):
+    """Get numbers in cardinal and diagonal cross"""
+    cx, cy = center_pos
+    cross_numbers = {"cardinal": [], "diagonal": []}
+    layers = (size - 1) // 2
+
+    # Cardinal cross
+    for r in range(size):
+        if r != cx and (r, cy) in grid:
+            cross_numbers["cardinal"].append(grid[(r, cy)])
+        if r != cy and (cx, r) in grid:
+            cross_numbers["cardinal"].append(grid[(cx, r)])
+
+    # Diagonal cross
+    for i in range(-layers, layers + 1):
+        if i != 0:
+            # Diagonal \
+            if (cx + i, cy + i) in grid:
+                cross_numbers["diagonal"].append(grid[(cx + i, cy + i)])
+            # Diagonal /
+            if (cx + i, cy - i) in grid:
+                cross_numbers["diagonal"].append(grid[(cx + i, cy - i)])
+
+    return cross_numbers
+
+if __name__ == "__main__":
+    layers = int(input("Enter the number of layers for the Square of Nine: "))
+    dynamic_number = int(input("Enter the dynamic number: "))
+    choice_number = int(input("Enter the number to choose from the square: "))
+
+    grid, size = generate_gann_grid(layers)
+
+    center_pos = find_position(grid, dynamic_number)
+
+    if center_pos:
+        cross_numbers = get_cross_numbers(grid, center_pos, size)
+
+        print("\n Square of Nine (showing a portion):")
+        center_layer = layers
+        for r in range(max(0, center_pos[1] - 5), min(size, center_pos[1] + 6)):
+            row_str = ""
+            for c in range(max(0, center_pos[0] - 5), min(size, center_pos[0] + 6)):
+                row_str += f"{grid.get((c, r), ' '):<5}"
+            print(row_str)
+
+        print(f"\nDynamic Number: {dynamic_number} at position {center_pos}")
+        print("Cardinal Cross Numbers:", cross_numbers["cardinal"])
+        print("Diagonal Cross Numbers:", cross_numbers["diagonal"])
+        print(f"Chosen Number: {choice_number} at position {find_position(grid, choice_number)}")
+    else:
+        print(f"Dynamic number {dynamic_number} not found in the grid.")
