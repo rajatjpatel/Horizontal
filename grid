@@ -1,0 +1,122 @@
+from IPython.display import display, HTML
+import ipywidgets as widgets
+import math
+
+def generate_gann_grid(layers=3):
+    size = 2 * layers + 1
+    grid = [[0] * size for _ in range(size)]
+    x, y = layers, layers  # Center coordinates
+    grid[x][y] = 1
+    
+    # Directions: RIGHT, DOWN, LEFT, UP (clockwise spiral)
+    directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]
+    dir_idx = 0  # Start moving RIGHT
+    steps = 1    # Steps to take in current direction
+    num = 2
+    
+    while num <= size * size:
+        for _ in range(2):  # Two turns per step size
+            dx, dy = directions[dir_idx]
+            for _ in range(steps):
+                x += dx
+                y += dy
+                if 0 <= x < size and 0 <= y < size:
+                    grid[x][y] = num
+                    num += 1
+            dir_idx = (dir_idx + 1) % 4  # Turn clockwise
+        steps += 1  # Increase steps after two directions
+    return grid
+
+def get_cross_lines(center, grid_size):
+    cx, cy = center
+    lines = []
+    # Diagonal Cross (X): 45° and 135° lines
+    lines.append([(cx + i, cy + i) for i in range(-cx, grid_size - cx)])  # 45°
+    lines.append([(cx + i, cy - i) for i in range(-cx, grid_size - cx)])  # 135°
+    # Cardinal Cross (+): 0° and 90° lines
+    lines.append([(cx, y) for y in range(grid_size)])  # Vertical
+    lines.append([(x, cy) for x in range(grid_size)])  # Horizontal
+    return lines
+
+def create_interactive_grid(layers=3):
+    grid = generate_gann_grid(layers)
+    size = 2 * layers + 1
+    num_to_pos = {grid[x][y]: (x, y) for x in range(size) for y in range(size)}
+    buttons = [[None for _ in range(size)] for _ in range(size)]
+    
+    grid_box = widgets.GridBox(
+        layout=widgets.Layout(
+            grid_template_columns=f"repeat({size}, 45px)",
+            border="1px solid #333",
+            gap="0px"
+        )
+    )
+
+    # Original center (1)
+    original_center = num_to_pos[1]
+    original_cross = set()
+    for line in get_cross_lines(original_center, size):
+        for (x, y) in line:
+            if 0 <= x < size and 0 <= y < size:
+                original_cross.add((x, y))
+
+    # Dynamic selection
+    selected_center = None
+    selected_cross = set()
+
+    def update_styles():
+        for x in range(size):
+            for y in range(size):
+                btn = buttons[x][y]
+                pos = (x, y)
+                num = grid[x][y]
+                btn.description = str(num)
+                btn.style.button_color = 'white'
+                
+                # Original center (1)
+                if pos == original_center:
+                    btn.style.button_color = '#90EE90'
+                # Original cross
+                elif pos in original_cross and pos != original_center:
+                    btn.style.button_color = '#FFFF00'
+                # Selected center
+                if pos == selected_center:
+                    btn.style.button_color = '#FFB6C1'
+                # Selected cross
+                if pos in selected_cross and pos != selected_center:
+                    btn.style.button_color = '#0000FF'
+
+    def on_click(btn):
+        nonlocal selected_center, selected_cross
+        num = int(btn.description)
+        selected_center = num_to_pos[num]
+        
+        # Calculate cross lines for selected center
+        selected_cross = set()
+        for line in get_cross_lines(selected_center, size):
+            for (x, y) in line:
+                if 0 <= x < size and 0 <= y < size:
+                    selected_cross.add((x, y))
+        
+        update_styles()
+
+    # Initialize buttons
+    for x in range(size):
+        for y in range(size):
+            btn = widgets.Button(
+                layout=widgets.Layout(
+                    width='50px',
+                    height='50px',
+                    border='1px solid #333',
+                    margin='0px'
+                )
+            )
+            btn.on_click(on_click)
+            buttons[x][y] = btn
+            grid_box.children += (btn,)
+    
+    update_styles()
+    display(grid_box)
+
+# Test with 3 layers (7x7 grid) to verify positions
+create_interactive_grid(layers=30)
